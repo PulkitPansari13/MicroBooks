@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  event_broker:
+    image: rabbitmq
+
+  user_db:
+    image: mysql:8.0.28
+    restart: always
+    environment:
+      # MYSQL_USER: root
+      MYSQL_DATABASE: users
+      MYSQL_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - ./Users/.dbdata:/var/lib/mysql
+    ports:
+      - 33066:3306
+
+  content_db:
+    image: mysql:8.0.28
+    restart: always
+    environment:
+      # MYSQL_USER: root
+      MYSQL_DATABASE: content
+      MYSQL_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - ./Content/.dbdata:/var/lib/mysql
+    ports:
+      - 33067:3306
+
+  interaction_db:
+    image: mysql:8.0.28
+    restart: always
+    environment:
+      # MYSQL_USER: root
+      MYSQL_DATABASE: interaction
+      MYSQL_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - ./Interaction/.dbdata:/var/lib/mysql
+    ports:
+      - 33068:3306
+
+  users:
+    build:
+      context: ./Users
+    command: ["./wait-for-it.sh", "event_broker:5672", --strict, "--", "./start_script.sh"]
+    restart: on-failure
+    ports:
+      - 8001:8000
+    volumes:
+      - ./Users:/app
+    depends_on:
+      - event_broker
+      - user_db
+
+  content:
+    build:
+      context: ./Content
+    command: ["./wait-for-it.sh", "event_broker:5672", --strict, "--", "./start_script.sh"]
+    restart: on-failure
+    ports:
+      - 8002:8000
+    volumes:
+      - ./Content:/app
+    depends_on:
+      - event_broker
+      - content_db
+
+  interaction:
+    build:
+      context: ./Interaction
+    command: ["./wait-for-it.sh", "event_broker:5672", --strict, "--", "./start_script.sh"]
+    restart: on-failure
+    ports:
+      - 8003:8000
+    volumes:
+      - ./Interaction:/app
+    depends_on:
+      - event_broker
+      - interaction_db
+
+  gateway:
+    build:
+      context: ./Gateway
+    command: 'python main.py'
+    restart: on-failure
+    ports:
+      - 8000:8000
+    volumes:
+      - ./Gateway:/app
+    depends_on:
+      - users
+      - content
+      - interaction
+
